@@ -37,15 +37,14 @@ class DIDService {
 
   async handleSDP(streamId, sessionId, answer) {
     try {
+      const payload = { session_id: sessionId, answer };
+      console.log('Posting to D-ID /sdp:', payload);
       await didClient.post(
         `/talks/streams/${streamId}/sdp`,
-        {
-          session_id: sessionId,
-          answer
-        }
+        payload
       );
     } catch (error) {
-      console.error('D-ID handleSDP error:', error.response?.data || error.message);
+      console.error('D-ID handleSDP error:', error.response?.data || error.message, error.response?.data || error);
       throw error;
     }
   }
