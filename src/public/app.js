@@ -11,34 +11,48 @@ let sessionId;
 async function initWebRTC() {
     try {
         status.textContent = 'Connecting…';
+        logToUI('Starting WebRTC initialization');
 
         // 1) Grab a new stream, D-ID's SDP offer, and ICE servers
-        const { streamId, sessionId, offer, iceServers } = await fetch('/streams', {
+        const streamResp = await fetch('/streams', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
-        }).then(r => r.json());
+        });
+        logToUI('POST /streams response status: ' + streamResp.status);
+        const { streamId, sessionId, offer, iceServers } = await streamResp.json();
+        logToUI(`Received streamId: ${streamId}, sessionId: ${sessionId}`);
+        logToUI('Received offer: ' + offer);
+        logToUI('Received iceServers: ' + JSON.stringify(iceServers));
 
         // 2) Build RTCPeerConnection with D-ID's STUN/TURN hints
         peerConnection = new RTCPeerConnection({ iceServers });
+        logToUI('Created RTCPeerConnection');
 
         // 3) When video arrives, hook it up
         peerConnection.ontrack = evt => {
             video.srcObject = evt.streams[0];
             status.style.display = 'none';
+            logToUI('ontrack fired: video stream received');
         };
 
         // 4) Trickle our own ICE candidates
         peerConnection.onicecandidate = async evt => {
             if (!evt.candidate) return;
-            await fetch(`/streams/${streamId}/ice`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    candidate:      evt.candidate.candidate,
-                    sdpMid:         evt.candidate.sdpMid,
-                    sdpMLineIndex:  evt.candidate.sdpMLineIndex
-                })
-            });
+            logToUI('Sending ICE candidate: ' + JSON.stringify(evt.candidate));
+            try {
+                const iceResp = await fetch(`/streams/${streamId}/ice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        candidate:      evt.candidate.candidate,
+                        sdpMid:         evt.candidate.sdpMid,
+                        sdpMLineIndex:  evt.candidate.sdpMLineIndex
+                    })
+                });
+                logToUI('POST /streams/' + streamId + '/ice response status: ' + iceResp.status);
+            } catch (iceErr) {
+                logToUI('ICE candidate POST error: ' + iceErr.message);
+            }
         };
 
         // 5) Apply D-ID's offer (must be the raw SDP string)
@@ -46,21 +60,30 @@ async function initWebRTC() {
             type: 'offer',
             sdp:  offer
         });
+        logToUI('Set remote description (offer)');
 
         // 6) Create our answer and send it exactly once
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
+        logToUI('Created and set local description (answer): ' + answer.sdp);
 
-        console.log('✅ Sending SDP answer:', answer.sdp);
-        await fetch(`/streams/${streamId}/sdp`, {
+        logToUI('Sending SDP answer: ' + JSON.stringify({ type: answer.type, sdp: answer.sdp }));
+        const sdpResp = await fetch(`/streams/${streamId}/sdp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
         });
+        logToUI('POST /streams/' + streamId + '/sdp response status: ' + sdpResp.status);
+        if (!sdpResp.ok) {
+            const errText = await sdpResp.text();
+            logToUI('SDP POST error response: ' + errText);
+        }
 
         status.textContent = 'Connected—waiting for avatar…';
+        logToUI('WebRTC handshake complete, waiting for avatar stream');
     }
     catch (err) {
+        logToUI('WebRTC initialization error: ' + (err.stack || err.message));
         console.error('WebRTC initialization error:', err);
         status.textContent = 'Connection failed—retrying…';
         setTimeout(initWebRTC, 10000);
@@ -170,4 +193,30 @@ window.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
         appendMessage('Welcome! Ask me anything.', 'bot');
     }
-}); 
+});
+
+// --- Logging support for UI ---
+const logOutput = document.getElementById('log-output');
+const copyLogsBtn = document.getElementById('copy-logs-btn');
+let logBuffer = [];
+
+function logToUI(msg) {
+    const time = new Date().toISOString();
+    const entry = `[${time}] ${msg}`;
+    logBuffer.push(entry);
+    if (logOutput) {
+        logOutput.textContent = logBuffer.join('\n');
+    }
+}
+
+if (copyLogsBtn) {
+    copyLogsBtn.addEventListener('click', () => {
+        if (logOutput) {
+            logOutput.style.display = 'block'; // Show logs for copy
+            navigator.clipboard.writeText(logOutput.textContent)
+                .then(() => alert('Logs copied to clipboard!'))
+                .catch(() => alert('Failed to copy logs.'));
+            setTimeout(() => { logOutput.style.display = 'none'; }, 1000);
+        }
+    });
+} 
