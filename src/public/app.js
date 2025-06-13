@@ -59,7 +59,7 @@ async function initWebRTC() {
             await fetch(`/streams/${streamId}/sdp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answer })
+                body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
             });
         }
 
