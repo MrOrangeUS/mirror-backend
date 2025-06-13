@@ -23,7 +23,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Store active streams
+// Store active streams with timestamps for cleanup
 const activeStreams = new Map();
 
 const TURN_URLS = process.env.TURN_URLS ? process.env.TURN_URLS.split(',') : [];
@@ -42,39 +42,69 @@ const getIceServers = () => [
     }))
 ];
 
-function logError(error) {
-  const logMsg = `\n[${new Date().toISOString()}] ${error.stack || error}`;
-  fs.appendFileSync('error.log', logMsg);
+// Cleanup old streams periodically (every 5 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [streamId, data] of activeStreams.entries()) {
+    if (now - data.timestamp > 30 * 60 * 1000) { // 30 minutes
+      didService.deleteStream(streamId, data.sessionId)
+        .catch(err => console.error('Error cleaning up stream:', err));
+      activeStreams.delete(streamId);
+    }
+  }
+}, 5 * 60 * 1000);
+
+// Helper function to handle D-ID API errors
+function handleDIDError(error, res) {
+  console.error('D-ID API error:', error.response?.data || error.message);
+  
+  if (error.response?.status === 429) {
+    return res.status(429).json({ 
+      error: 'Rate limit exceeded. Please try again in a few seconds.',
+      retryAfter: error.response.headers['retry-after'] || 5
+    });
+  }
+  
+  if (error.response?.status === 403) {
+    return res.status(403).json({ 
+      error: error.response.data.description || 'Session limit exceeded'
+    });
+  }
+  
+  return res.status(500).json({ 
+    error: 'Internal server error',
+    details: error.response?.data || error.message
+  });
 }
 
 // Routes
 app.post('/streams', async (req, res) => {
   try {
     const { streamId, sessionId, offer } = await didService.createStream();
-    activeStreams.set(streamId, { sessionId });
+    activeStreams.set(streamId, { 
+      sessionId,
+      timestamp: Date.now()
+    });
     res.json({ streamId, sessionId, offer, iceServers: getIceServers() });
   } catch (error) {
-    logError(error);
-    if (error.response && error.response.data && error.response.status === 403) {
-      return res.status(403).json({ error: error.response.data.description });
-    }
-    res.status(500).json({ error: 'Failed to create stream' });
+    handleDIDError(error, res);
   }
 });
 
 app.post('/streams/:streamId/sdp', async (req, res) => {
   const { streamId } = req.params;
-  // Defensive: always extract the nested answer object if present
   const answer = req.body.answer && req.body.answer.type ? req.body.answer : req.body;
   const stream = activeStreams.get(streamId);
-  if (!stream) return res.status(404).json({ error: 'Stream not found' });
+  
+  if (!stream) {
+    return res.status(404).json({ error: 'Stream not found' });
+  }
 
   try {
     await didService.handleSDP(streamId, stream.sessionId, answer);
     res.json({ success: true });
-  } catch (err) {
-    console.error('Error in handleSDP:', err.response?.data || err);
-    res.status(500).json({ error: 'Failed to deliver SDP answer' });
+  } catch (error) {
+    handleDIDError(error, res);
   }
 });
 
@@ -83,13 +113,15 @@ app.post('/streams/:streamId/ice', async (req, res) => {
     const { streamId } = req.params;
     const { candidate, sdpMid, sdpMLineIndex } = req.body;
     const stream = activeStreams.get(streamId);
-    if (!stream) return res.status(404).json({ error: 'Stream not found' });
+    
+    if (!stream) {
+      return res.status(404).json({ error: 'Stream not found' });
+    }
+    
     await didService.handleICE(streamId, stream.sessionId, { candidate, sdpMid, sdpMLineIndex });
     res.json({ success: true });
   } catch (error) {
-    logError(error);
-    console.error('Error handling ICE candidate:', error);
-    res.status(500).json({ error: 'Failed to handle ICE candidate' });
+    handleDIDError(error, res);
   }
 });
 
@@ -98,15 +130,15 @@ app.post('/streams/:streamId/say', async (req, res) => {
     const { streamId } = req.params;
     const { text } = req.body;
     const stream = activeStreams.get(streamId);
+    
     if (!stream) {
       return res.status(404).json({ error: 'Stream not found' });
     }
+    
     await didService.say(streamId, stream.sessionId, text);
     res.json({ success: true });
   } catch (error) {
-    logError(error);
-    console.error('Error sending utterance:', error);
-    res.status(500).json({ error: 'Failed to send utterance' });
+    handleDIDError(error, res);
   }
 });
 
@@ -114,16 +146,16 @@ app.delete('/streams/:streamId', async (req, res) => {
   try {
     const { streamId } = req.params;
     const stream = activeStreams.get(streamId);
+    
     if (!stream) {
       return res.status(404).json({ error: 'Stream not found' });
     }
+    
     await didService.deleteStream(streamId, stream.sessionId);
     activeStreams.delete(streamId);
     res.json({ success: true });
   } catch (error) {
-    logError(error);
-    console.error('Error deleting stream:', error);
-    res.status(500).json({ error: 'Failed to delete stream' });
+    handleDIDError(error, res);
   }
 });
 

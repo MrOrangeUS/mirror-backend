@@ -6,6 +6,45 @@ const qr = document.getElementById('qr');
 let peerConnection;
 let streamId;
 let sessionId;
+let iceCandidateQueue = [];
+let isProcessingIceQueue = false;
+const ICE_CANDIDATE_DELAY = 1000; // 1 second delay between ICE candidates
+
+// Process ICE candidate queue with rate limiting
+async function processIceCandidateQueue() {
+    if (isProcessingIceQueue || iceCandidateQueue.length === 0) return;
+    
+    isProcessingIceQueue = true;
+    const candidate = iceCandidateQueue.shift();
+    
+    try {
+        logToUI('Sending ICE candidate: ' + JSON.stringify(candidate));
+        const iceResp = await fetch(`/streams/${streamId}/ice`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                candidate: candidate.candidate,
+                sdpMid: candidate.sdpMid,
+                sdpMLineIndex: candidate.sdpMLineIndex
+            })
+        });
+        
+        if (iceResp.status === 429) {
+            logToUI('Rate limit hit for ICE candidate, will retry later');
+            iceCandidateQueue.unshift(candidate); // Put back at front of queue
+            setTimeout(processIceCandidateQueue, 5000); // Wait 5 seconds before retry
+            return;
+        }
+        
+        logToUI('POST /streams/' + streamId + '/ice response status: ' + iceResp.status);
+    } catch (iceErr) {
+        logToUI('ICE candidate POST error: ' + iceErr.message);
+        iceCandidateQueue.unshift(candidate); // Put back at front of queue
+    }
+    
+    isProcessingIceQueue = false;
+    setTimeout(processIceCandidateQueue, ICE_CANDIDATE_DELAY);
+}
 
 // Initialize WebRTC
 async function initWebRTC() {
@@ -27,13 +66,23 @@ async function initWebRTC() {
             headers: { 'Content-Type': 'application/json' }
         });
         logToUI('POST /streams response status: ' + streamResp.status);
+        
+        if (streamResp.status === 429) {
+            logToUI('Rate limit hit for stream creation, retrying in 5 seconds...');
+            setTimeout(initWebRTC, 5000);
+            return;
+        }
+        
         if (streamResp.status === 403) {
             const err = await streamResp.json();
             logToUI('D-ID error: ' + err.error);
             alert('D-ID error: ' + err.error + '. Please close other sessions or try again later.');
-            return; // Stop retrying!
+            return;
         }
-        const { streamId, sessionId, offer, iceServers } = await streamResp.json();
+        
+        const { streamId: newStreamId, sessionId: newSessionId, offer, iceServers } = await streamResp.json();
+        streamId = newStreamId;
+        sessionId = newSessionId;
         logToUI(`Received streamId: ${streamId}, sessionId: ${sessionId}`);
         logToUI('Received offer: ' + offer);
         logToUI('Received iceServers: ' + JSON.stringify(iceServers));
@@ -49,30 +98,17 @@ async function initWebRTC() {
             logToUI('ontrack fired: video stream received');
         };
 
-        // 4) Trickle our own ICE candidates
-        peerConnection.onicecandidate = async evt => {
+        // 4) Queue ICE candidates for rate-limited sending
+        peerConnection.onicecandidate = evt => {
             if (!evt.candidate) return;
-            logToUI('Sending ICE candidate: ' + JSON.stringify(evt.candidate));
-            try {
-                const iceResp = await fetch(`/streams/${streamId}/ice`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        candidate:      evt.candidate.candidate,
-                        sdpMid:         evt.candidate.sdpMid,
-                        sdpMLineIndex:  evt.candidate.sdpMLineIndex
-                    })
-                });
-                logToUI('POST /streams/' + streamId + '/ice response status: ' + iceResp.status);
-            } catch (iceErr) {
-                logToUI('ICE candidate POST error: ' + iceErr.message);
-            }
+            iceCandidateQueue.push(evt.candidate);
+            processIceCandidateQueue();
         };
 
         // 5) Apply D-ID's offer (must be the raw SDP string)
         await peerConnection.setRemoteDescription({
             type: 'offer',
-            sdp:  offer
+            sdp: offer
         });
         logToUI('Set remote description (offer)');
 
@@ -87,6 +123,18 @@ async function initWebRTC() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
         });
+        
+        if (sdpResp.status === 429) {
+            logToUI('Rate limit hit for SDP answer, retrying in 5 seconds...');
+            setTimeout(() => {
+                fetch(`/streams/${streamId}/sdp`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
+                });
+            }, 5000);
+        }
+        
         logToUI('POST /streams/' + streamId + '/sdp response status: ' + sdpResp.status);
         if (!sdpResp.ok) {
             const errText = await sdpResp.text();
