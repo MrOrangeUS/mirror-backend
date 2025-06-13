@@ -26,6 +26,19 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Store active streams
 const activeStreams = new Map();
 
+const TURN_URLS = process.env.TURN_URLS ? process.env.TURN_URLS.split(',') : [];
+const TURN_USERNAME = process.env.TURN_USERNAME;
+const TURN_CREDENTIAL = process.env.TURN_CREDENTIAL;
+
+const getIceServers = () => [
+  { urls: 'stun:stun.l.google.com:19302' },
+  ...TURN_URLS.filter(Boolean).map(url => ({
+    urls: url,
+    username: TURN_USERNAME,
+    credential: TURN_CREDENTIAL
+  }))
+];
+
 function logError(error) {
   const logMsg = `\n[${new Date().toISOString()}] ${error.stack || error}`;
   fs.appendFileSync('error.log', logMsg);
@@ -34,9 +47,9 @@ function logError(error) {
 // Routes
 app.post('/streams', async (req, res) => {
   try {
-    const { streamId, sessionId, offer, iceServers } = await didService.createStream();
+    const { streamId, sessionId, offer } = await didService.createStream();
     activeStreams.set(streamId, { sessionId });
-    res.json({ streamId, sessionId, offer, iceServers });
+    res.json({ streamId, sessionId, offer, iceServers: getIceServers() });
   } catch (error) {
     logError(error);
     console.error('Error creating stream:', error);
