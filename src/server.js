@@ -52,7 +52,9 @@ app.post('/streams', async (req, res) => {
     res.json({ streamId, sessionId, offer, iceServers: getIceServers() });
   } catch (error) {
     logError(error);
-    console.error('Error creating stream:', error);
+    if (error.response && error.response.data && error.response.status === 403) {
+      return res.status(403).json({ error: error.response.data.description });
+    }
     res.status(500).json({ error: 'Failed to create stream' });
   }
 });

@@ -27,6 +27,12 @@ async function initWebRTC() {
             headers: { 'Content-Type': 'application/json' }
         });
         logToUI('POST /streams response status: ' + streamResp.status);
+        if (streamResp.status === 403) {
+            const err = await streamResp.json();
+            logToUI('D-ID error: ' + err.error);
+            alert('D-ID error: ' + err.error + '. Please close other sessions or try again later.');
+            return; // Stop retrying!
+        }
         const { streamId, sessionId, offer, iceServers } = await streamResp.json();
         logToUI(`Received streamId: ${streamId}, sessionId: ${sessionId}`);
         logToUI('Received offer: ' + offer);
@@ -94,6 +100,10 @@ async function initWebRTC() {
         logToUI('WebRTC initialization error: ' + (err.stack || err.message));
         console.error('WebRTC initialization error:', err);
         if (status) status.textContent = 'Connection failed—retrying…';
+        if (err && err.message && err.message.includes('max user sessions')) {
+            logToUI('Not retrying due to D-ID session limit.');
+            return;
+        }
         logToUI('Retrying initWebRTC in 10 seconds...');
         setTimeout(initWebRTC, 10000);
     }
