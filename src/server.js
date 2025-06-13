@@ -45,18 +45,17 @@ app.post('/streams', async (req, res) => {
 });
 
 app.post('/streams/:streamId/sdp', async (req, res) => {
+  const { streamId } = req.params;
+  const { answer } = req.body; // answer is { type, sdp }
+  const stream = activeStreams.get(streamId);
+  if (!stream) return res.status(404).json({ error: 'Stream not found' });
+
   try {
-    const { streamId } = req.params;
-    const { answer } = req.body;
-    console.log('Received answer:', answer);
-    const stream = activeStreams.get(streamId);
-    if (!stream) return res.status(404).json({ error: 'Stream not found' });
     await didService.handleSDP(streamId, stream.sessionId, answer);
     res.json({ success: true });
-  } catch (error) {
-    logError(error);
-    console.error('Error handling SDP:', error);
-    res.status(500).json({ error: 'Failed to handle SDP' });
+  } catch (err) {
+    console.error('Error in handleSDP:', err.response?.data || err);
+    res.status(500).json({ error: 'Failed to deliver SDP answer' });
   }
 });
 
