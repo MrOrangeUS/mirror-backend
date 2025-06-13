@@ -48,8 +48,12 @@ async function initWebRTC() {
             body: JSON.stringify({ sdp: offer })
         });
 
-        const { sdp: answer } = await sdpResponse.json();
-        await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+        const sdpData = await sdpResponse.json();
+        if (sdpData.sdp && sdpData.answer) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpData.answer));
+        } else if (sdpData.sdp) {
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpData.sdp));
+        }
 
     } catch (error) {
         console.error('WebRTC initialization error:', error);

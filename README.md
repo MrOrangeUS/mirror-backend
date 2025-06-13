@@ -109,4 +109,8 @@ The system includes automatic:
 
 ## License
 
-MIT License - see LICENSE file for details 
+MIT License - see LICENSE file for details
+
+---
+
+Note: The chatbot system prompt was updated in June 2025 to make responses briefer (1–2 sentences) and more nonchalant/witty by default. 

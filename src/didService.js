@@ -35,11 +35,12 @@ class DIDService {
     }
   }
 
-  async handleSDP(streamId, sessionId, sdp) {
+  async handleSDP(streamId, sessionId, sdp, answer) {
     try {
       await didClient.post(`/talks/streams/${streamId}/sdp`, {
         session_id: sessionId,
-        sdp
+        sdp,
+        answer
       });
     } catch (error) {
       console.error('D-ID handleSDP error:', error.response?.data || error.message);
