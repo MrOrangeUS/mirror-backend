@@ -93,7 +93,8 @@ async function initWebRTC() {
     catch (err) {
         logToUI('WebRTC initialization error: ' + (err.stack || err.message));
         console.error('WebRTC initialization error:', err);
-        status.textContent = 'Connection failed—retrying…';
+        if (status) status.textContent = 'Connection failed—retrying…';
+        logToUI('Retrying initWebRTC in 10 seconds...');
         setTimeout(initWebRTC, 10000);
     }
 }
