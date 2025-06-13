@@ -10,80 +10,60 @@ let sessionId;
 // Initialize WebRTC
 async function initWebRTC() {
     try {
-        // Create stream and get offer/ICE servers
-        const response = await fetch('/streams', { method: 'POST' });
-        const { streamId, sessionId, offer, iceServers } = await response.json();
-        window.streamId = streamId;
-        window.sessionId = sessionId;
+        status.textContent = 'Connecting…';
 
+        // 1) Grab a new stream, D-ID's SDP offer, and ICE servers
+        const { streamId, sessionId, offer, iceServers } = await fetch('/streams', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        }).then(r => r.json());
+
+        // 2) Build RTCPeerConnection with D-ID's STUN/TURN hints
         peerConnection = new RTCPeerConnection({ iceServers });
 
-        let firstIceCandidateSent = false;
-        let pendingAnswer = null;
-        let answerSent = false;
-
-        peerConnection.ontrack = (event) => {
-            video.srcObject = event.streams[0];
+        // 3) When video arrives, hook it up
+        peerConnection.ontrack = evt => {
+            video.srcObject = evt.streams[0];
             status.style.display = 'none';
         };
 
-        peerConnection.onicecandidate = async (event) => {
-            if (event.candidate && !firstIceCandidateSent) {
-                console.log('Sending first ICE candidate:', event.candidate);
-                await fetch(`/streams/${streamId}/ice`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        candidate: event.candidate.candidate,
-                        sdpMid: event.candidate.sdpMid,
-                        sdpMLineIndex: event.candidate.sdpMLineIndex
-                    })
-                });
-                firstIceCandidateSent = true;
-                if (pendingAnswer && !answerSent) {
-                    console.log('Sending answer after ICE:', pendingAnswer);
-                    await fetch(`/streams/${streamId}/sdp`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ answer: pendingAnswer })
-                    });
-                    answerSent = true;
-                    pendingAnswer = null;
-                }
-            } else if (event.candidate) {
-                await fetch(`/streams/${streamId}/ice`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        candidate: event.candidate.candidate,
-                        sdpMid: event.candidate.sdpMid,
-                        sdpMLineIndex: event.candidate.sdpMLineIndex
-                    })
-                });
-            }
-        };
-
-        await peerConnection.setRemoteDescription({ type: 'offer', sdp: offer });
-
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        const answerObj = { type: answer.type, sdp: answer.sdp };
-        console.log('Prepared answer object:', answerObj);
-        if (firstIceCandidateSent && !answerSent) {
-            console.log('Sending answer immediately:', answerObj);
-            await fetch(`/streams/${streamId}/sdp`, {
+        // 4) Trickle our own ICE candidates
+        peerConnection.onicecandidate = async evt => {
+            if (!evt.candidate) return;
+            await fetch(`/streams/${streamId}/ice`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answer: answerObj })
+                body: JSON.stringify({
+                    candidate:      evt.candidate.candidate,
+                    sdpMid:         evt.candidate.sdpMid,
+                    sdpMLineIndex:  evt.candidate.sdpMLineIndex
+                })
             });
-            answerSent = true;
-        } else {
-            pendingAnswer = answerObj;
-        }
-    } catch (error) {
-        console.error('WebRTC initialization error:', error);
-        status.textContent = 'Connection failed. Retrying...';
-        setTimeout(initWebRTC, 30000);
+        };
+
+        // 5) Apply D-ID's offer (must be the raw SDP string)
+        await peerConnection.setRemoteDescription({
+            type: 'offer',
+            sdp:  offer
+        });
+
+        // 6) Create our answer and send it exactly once
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+
+        console.log('✅ Sending SDP answer:', answer.sdp);
+        await fetch(`/streams/${streamId}/sdp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer: answer.sdp })
+        });
+
+        status.textContent = 'Connected—waiting for avatar…';
+    }
+    catch (err) {
+        console.error('WebRTC initialization error:', err);
+        status.textContent = 'Connection failed—retrying…';
+        setTimeout(initWebRTC, 10000);
     }
 }
 
