@@ -32,11 +32,14 @@ const TURN_CREDENTIAL = process.env.TURN_CREDENTIAL;
 
 const getIceServers = () => [
   { urls: 'stun:stun.l.google.com:19302' },
-  ...TURN_URLS.filter(Boolean).map(url => ({
-    urls: url,
-    username: TURN_USERNAME,
-    credential: TURN_CREDENTIAL
-  }))
+  ...TURN_URLS.filter(Boolean)
+    .map(url => url.replace(/\?.*$/, '')) // Remove ?transport=... if present
+    .filter(url => url.startsWith('turn:'))
+    .map(url => ({
+      urls: url,
+      username: TURN_USERNAME,
+      credential: TURN_CREDENTIAL
+    }))
 ];
 
 function logError(error) {
