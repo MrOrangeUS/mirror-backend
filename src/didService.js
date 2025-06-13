@@ -26,7 +26,7 @@ class DIDService {
       return {
         streamId: id,
         sessionId: session_id,
-        offer,
+        offer: typeof offer === 'string' ? offer : (offer && offer.sdp ? offer.sdp : ''),
         iceServers: ice_servers
       };
     } catch (error) {
