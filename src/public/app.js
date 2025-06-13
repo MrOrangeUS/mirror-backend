@@ -42,6 +42,7 @@ async function initWebRTC() {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
 
+        // Send offer to backend and get D-ID's offer (if needed)
         const sdpResponse = await fetch(`/streams/${streamId}/sdp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -49,10 +50,17 @@ async function initWebRTC() {
         });
 
         const sdpData = await sdpResponse.json();
-        if (sdpData.sdp && sdpData.answer) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpData.answer));
-        } else if (sdpData.sdp) {
+        // Assume sdpData.sdp is the offer from D-ID
+        if (sdpData.sdp) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpData.sdp));
+            // Create answer and send to backend
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            await fetch(`/streams/${streamId}/sdp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer })
+            });
         }
 
     } catch (error) {
