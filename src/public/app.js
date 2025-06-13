@@ -14,21 +14,41 @@ async function initWebRTC() {
     logToUI('Starting WebRTC initialization');
     console.log('Starting WebRTC initialization');
     try {
-        status.textContent = 'Connecting…';
+        if (!status) {
+            logToUI('ERROR: status element not found!');
+            console.error('ERROR: status element not found!');
+        } else {
+            status.textContent = 'Connecting…';
+        }
+
+        // Xirsys TURN server config
+        const iceServers = [
+            { urls: 'stun:stun.l.google.com:19302' },
+            {
+                urls: 'turn:global.xirsys.net:3478?transport=udp',
+                username: 'rneal315',
+                credential: 'a9c77660-4819-11f0-bb35-0242ac150002'
+            },
+            {
+                urls: 'turn:global.xirsys.net:3478?transport=tcp',
+                username: 'rneal315',
+                credential: 'a9c77660-4819-11f0-bb35-0242ac150002'
+            }
+        ];
+
         // 1) Grab a new stream, D-ID's SDP offer, and ICE servers
         const streamResp = await fetch('/streams', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
         logToUI('POST /streams response status: ' + streamResp.status);
-        const { streamId, sessionId, offer, iceServers } = await streamResp.json();
+        const { streamId, sessionId, offer } = await streamResp.json();
         logToUI(`Received streamId: ${streamId}, sessionId: ${sessionId}`);
         logToUI('Received offer: ' + offer);
-        logToUI('Received iceServers: ' + JSON.stringify(iceServers));
 
-        // 2) Build RTCPeerConnection with D-ID's STUN/TURN hints
+        // 2) Build RTCPeerConnection with Xirsys TURN servers
         peerConnection = new RTCPeerConnection({ iceServers });
-        logToUI('Created RTCPeerConnection');
+        logToUI('Created RTCPeerConnection with Xirsys TURN');
 
         // 3) When video arrives, hook it up
         peerConnection.ontrack = evt => {
