@@ -19,15 +19,14 @@ class DIDService {
     try {
       const response = await didClient.post('/talks/streams', {
         source_url: AVATAR_URL,
-        driver_url: 'bank://lively',
-        config: {
-          stitch: true
-        }
+        driver_url: 'bank://lively/',
+        config: { stitch: true }
       });
-      
       return {
         streamId: response.data.id,
-        sessionId: response.data.session_id
+        sessionId: response.data.session_id,
+        offer: response.data.offer,
+        ice_servers: response.data.ice_servers
       };
     } catch (error) {
       console.error('D-ID createStream error:', error.response?.data || error.message);

@@ -10,16 +10,14 @@ let sessionId;
 // Initialize WebRTC
 async function initWebRTC() {
     try {
-        // Create stream
+        // Create stream and get offer/ICE servers
         const response = await fetch('/streams', { method: 'POST' });
-        const data = await response.json();
-        streamId = data.streamId;
-        sessionId = data.sessionId;
+        const { streamId: id, sessionId: sessId, offer, ice_servers } = await response.json();
+        streamId = id;
+        sessionId = sessId;
 
-        // Setup WebRTC
-        peerConnection = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+        // Setup WebRTC with D-ID's ICE servers
+        peerConnection = new RTCPeerConnection({ iceServers: ice_servers });
 
         // Handle incoming video stream
         peerConnection.ontrack = (event) => {
@@ -33,35 +31,26 @@ async function initWebRTC() {
                 await fetch(`/streams/${streamId}/ice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ candidate: event.candidate })
+                    body: JSON.stringify({
+                        candidate: event.candidate.candidate,
+                        sdpMid: event.candidate.sdpMid,
+                        sdpMLineIndex: event.candidate.sdpMLineIndex
+                    })
                 });
             }
         };
 
-        // Create and send offer
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
+        // Set D-ID's offer as remote description
+        await peerConnection.setRemoteDescription({ type: 'offer', sdp: offer });
 
-        // Send offer to backend and get D-ID's offer (if needed)
-        const sdpResponse = await fetch(`/streams/${streamId}/sdp`, {
+        // Create and send answer
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        await fetch(`/streams/${streamId}/sdp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sdp: offer })
+            body: JSON.stringify({ answer: answer.sdp })
         });
-
-        const sdpData = await sdpResponse.json();
-        // Assume sdpData.sdp is the offer from D-ID
-        if (sdpData.sdp) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(sdpData.sdp));
-            // Create answer and send to backend
-            const answer = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(answer);
-            await fetch(`/streams/${streamId}/sdp`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
-            });
-        }
 
     } catch (error) {
         console.error('WebRTC initialization error:', error);
