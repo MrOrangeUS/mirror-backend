@@ -11,10 +11,10 @@ let sessionId;
 async function initWebRTC() {
     logToUI('initWebRTC called');
     console.log('initWebRTC called');
+    logToUI('Starting WebRTC initialization');
+    console.log('Starting WebRTC initialization');
     try {
         status.textContent = 'Connecting…';
-        logToUI('Starting WebRTC initialization');
-
         // 1) Grab a new stream, D-ID's SDP offer, and ICE servers
         const streamResp = await fetch('/streams', {
             method: 'POST',
