@@ -35,25 +35,32 @@ class DIDService {
     }
   }
 
-  async handleSDP(streamId, sessionId, sdp, answer) {
+  async handleSDP(streamId, sessionId, answer) {
     try {
-      await didClient.post(`/talks/streams/${streamId}/sdp`, {
-        session_id: sessionId,
-        sdp,
-        answer
-      });
+      await didClient.post(
+        `/talks/streams/${streamId}/sdp`,
+        {
+          session_id: sessionId,
+          answer
+        }
+      );
     } catch (error) {
       console.error('D-ID handleSDP error:', error.response?.data || error.message);
       throw error;
     }
   }
 
-  async handleICE(streamId, sessionId, candidate) {
+  async handleICE(streamId, sessionId, { candidate, sdpMid, sdpMLineIndex }) {
     try {
-      await didClient.post(`/talks/streams/${streamId}/ice`, {
-        session_id: sessionId,
-        candidate
-      });
+      await didClient.post(
+        `/talks/streams/${streamId}/ice`,
+        {
+          session_id: sessionId,
+          candidate,
+          sdpMid,
+          sdpMLineIndex
+        }
+      );
     } catch (error) {
       console.error('D-ID handleICE error:', error.response?.data || error.message);
       throw error;

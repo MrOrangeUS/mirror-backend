@@ -47,12 +47,10 @@ app.post('/streams', async (req, res) => {
 app.post('/streams/:streamId/sdp', async (req, res) => {
   try {
     const { streamId } = req.params;
-    const { sdp, answer } = req.body;
+    const { answer } = req.body;
     const stream = activeStreams.get(streamId);
-    if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
-    }
-    await didService.handleSDP(streamId, stream.sessionId, sdp, answer);
+    if (!stream) return res.status(404).json({ error: 'Stream not found' });
+    await didService.handleSDP(streamId, stream.sessionId, answer);
     res.json({ success: true });
   } catch (error) {
     logError(error);
@@ -64,12 +62,10 @@ app.post('/streams/:streamId/sdp', async (req, res) => {
 app.post('/streams/:streamId/ice', async (req, res) => {
   try {
     const { streamId } = req.params;
-    const { candidate } = req.body;
+    const { candidate, sdpMid, sdpMLineIndex } = req.body;
     const stream = activeStreams.get(streamId);
-    if (!stream) {
-      return res.status(404).json({ error: 'Stream not found' });
-    }
-    await didService.handleICE(streamId, stream.sessionId, candidate);
+    if (!stream) return res.status(404).json({ error: 'Stream not found' });
+    await didService.handleICE(streamId, stream.sessionId, { candidate, sdpMid, sdpMLineIndex });
     res.json({ success: true });
   } catch (error) {
     logError(error);
