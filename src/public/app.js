@@ -12,12 +12,12 @@ async function initWebRTC() {
     try {
         // Create stream and get offer/ICE servers
         const response = await fetch('/streams', { method: 'POST' });
-        const { streamId: id, sessionId: sessId, offer, ice_servers } = await response.json();
-        streamId = id;
-        sessionId = sessId;
+        const { streamId, sessionId, offer, iceServers } = await response.json();
+        window.streamId = streamId;
+        window.sessionId = sessionId;
 
         // Setup WebRTC with D-ID's ICE servers
-        peerConnection = new RTCPeerConnection({ iceServers: ice_servers });
+        peerConnection = new RTCPeerConnection({ iceServers });
 
         // Handle incoming video stream
         peerConnection.ontrack = (event) => {

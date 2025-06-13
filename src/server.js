@@ -34,9 +34,9 @@ function logError(error) {
 // Routes
 app.post('/streams', async (req, res) => {
   try {
-    const { streamId, sessionId, offer, ice_servers } = await didService.createStream();
+    const { streamId, sessionId, offer, iceServers } = await didService.createStream();
     activeStreams.set(streamId, { sessionId });
-    res.json({ streamId, sessionId, offer, ice_servers });
+    res.json({ streamId, sessionId, offer, iceServers });
   } catch (error) {
     logError(error);
     console.error('Error creating stream:', error);
