@@ -46,6 +46,7 @@ async function initWebRTC() {
         // Create and send answer
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
+        console.log('Sending answer.sdp:', answer.sdp);
         await fetch(`/streams/${streamId}/sdp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

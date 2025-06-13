@@ -48,6 +48,7 @@ app.post('/streams/:streamId/sdp', async (req, res) => {
   try {
     const { streamId } = req.params;
     const { answer } = req.body;
+    console.log('Received answer:', answer);
     const stream = activeStreams.get(streamId);
     if (!stream) return res.status(404).json({ error: 'Stream not found' });
     await didService.handleSDP(streamId, stream.sessionId, answer);
