@@ -16,18 +16,39 @@ async function initWebRTC() {
         window.streamId = streamId;
         window.sessionId = sessionId;
 
-        // Setup WebRTC with D-ID's ICE servers
         peerConnection = new RTCPeerConnection({ iceServers });
 
-        // Handle incoming video stream
+        let firstIceCandidateSent = false;
+        let pendingAnswer = null;
+
         peerConnection.ontrack = (event) => {
             video.srcObject = event.streams[0];
             status.style.display = 'none';
         };
 
-        // Handle ICE candidates
         peerConnection.onicecandidate = async (event) => {
-            if (event.candidate) {
+            if (event.candidate && !firstIceCandidateSent) {
+                console.log('Sending first ICE candidate:', event.candidate);
+                await fetch(`/streams/${streamId}/ice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        candidate: event.candidate.candidate,
+                        sdpMid: event.candidate.sdpMid,
+                        sdpMLineIndex: event.candidate.sdpMLineIndex
+                    })
+                });
+                firstIceCandidateSent = true;
+                if (pendingAnswer) {
+                    console.log('Sending answer after ICE:', pendingAnswer);
+                    await fetch(`/streams/${streamId}/sdp`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ answer: pendingAnswer })
+                    });
+                    pendingAnswer = null;
+                }
+            } else if (event.candidate) {
                 await fetch(`/streams/${streamId}/ice`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -40,19 +61,22 @@ async function initWebRTC() {
             }
         };
 
-        // Set D-ID's offer as remote description
         await peerConnection.setRemoteDescription({ type: 'offer', sdp: offer });
 
-        // Create and send answer
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        console.log('Sending answer:', answer);
-        await fetch(`/streams/${streamId}/sdp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ answer: { type: answer.type, sdp: answer.sdp } })
-        });
-
+        const answerObj = { type: answer.type, sdp: answer.sdp };
+        console.log('Prepared answer object:', answerObj);
+        if (firstIceCandidateSent) {
+            console.log('Sending answer immediately:', answerObj);
+            await fetch(`/streams/${streamId}/sdp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ answer: answerObj })
+            });
+        } else {
+            pendingAnswer = answerObj;
+        }
     } catch (error) {
         console.error('WebRTC initialization error:', error);
         status.textContent = 'Connection failed. Retrying...';

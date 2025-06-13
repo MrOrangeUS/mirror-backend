@@ -19,7 +19,7 @@ class DIDService {
     try {
       const resp = await didClient.post('/talks/streams', {
         source_url: AVATAR_URL,
-        driver_url: 'bank://lively/',
+        driver_url: 'bank://lively/driver-06',
         config: { stitch: true }
       });
       const { id, session_id, offer, ice_servers } = resp.data;
