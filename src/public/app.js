@@ -20,6 +20,7 @@ async function initWebRTC() {
 
         let firstIceCandidateSent = false;
         let pendingAnswer = null;
+        let answerSent = false;
 
         peerConnection.ontrack = (event) => {
             video.srcObject = event.streams[0];
@@ -39,13 +40,14 @@ async function initWebRTC() {
                     })
                 });
                 firstIceCandidateSent = true;
-                if (pendingAnswer) {
+                if (pendingAnswer && !answerSent) {
                     console.log('Sending answer after ICE:', pendingAnswer);
                     await fetch(`/streams/${streamId}/sdp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ answer: pendingAnswer })
                     });
+                    answerSent = true;
                     pendingAnswer = null;
                 }
             } else if (event.candidate) {
@@ -67,13 +69,14 @@ async function initWebRTC() {
         await peerConnection.setLocalDescription(answer);
         const answerObj = { type: answer.type, sdp: answer.sdp };
         console.log('Prepared answer object:', answerObj);
-        if (firstIceCandidateSent) {
+        if (firstIceCandidateSent && !answerSent) {
             console.log('Sending answer immediately:', answerObj);
             await fetch(`/streams/${streamId}/sdp`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ answer: answerObj })
             });
+            answerSent = true;
         } else {
             pendingAnswer = answerObj;
         }
