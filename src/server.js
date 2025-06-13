@@ -46,7 +46,8 @@ app.post('/streams', async (req, res) => {
 
 app.post('/streams/:streamId/sdp', async (req, res) => {
   const { streamId } = req.params;
-  const { answer } = req.body; // answer is { type, sdp }
+  // Defensive: always extract the nested answer object if present
+  const answer = req.body.answer && req.body.answer.type ? req.body.answer : req.body;
   const stream = activeStreams.get(streamId);
   if (!stream) return res.status(404).json({ error: 'Stream not found' });
 
