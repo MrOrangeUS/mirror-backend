@@ -9,6 +9,8 @@ let sessionId;
 
 // Initialize WebRTC
 async function initWebRTC() {
+    logToUI('initWebRTC called');
+    console.log('initWebRTC called');
     try {
         status.textContent = 'Connecting…';
         logToUI('Starting WebRTC initialization');
@@ -115,6 +117,7 @@ async function handleChatMessage(message) {
 // Socket.IO event handlers
 socket.on('connect', () => {
     console.log('Connected to server');
+    logToUI('Socket.IO connected, calling initWebRTC');
     initWebRTC();
 });
 
