@@ -1,7 +1,7 @@
 {
   "name": "mirror-backend",
   "version": "1.0.0",
-  "description": "TikTok Live chatbot avatar using D-ID and ChatGPT",
+  "description": "TikTok Live chatbot with TTS using ElevenLabs and ChatGPT",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

@@ -1,20 +1,19 @@
-# Mirror.exe - TikTok Live AI Avatar
+# Mirror.exe - TikTok Live AI Chatbot
 
-A real-time AI avatar chatbot for TikTok Live streams, powered by D-ID for video generation and OpenAI's ChatGPT for conversation.
+A real-time AI chatbot for TikTok Live streams, powered by ElevenLabs for text-to-speech and OpenAI's ChatGPT for conversation.
 
 ## Features
 
-- Real-time AI avatar streaming using D-ID
-- Natural conversation powered by ChatGPT
-- WebRTC-based video streaming
+- Real-time AI chatbot responses using ChatGPT
+- High-quality text-to-speech using ElevenLabs
 - TikTok Live integration via OBS
-- Automatic reconnection and error handling
+- Automatic error handling and logging
 - QR code overlay for easy access
 
 ## Prerequisites
 
 - Node.js 18+ and npm
-- D-ID API key
+- ElevenLabs API key
 - OpenAI API key
 - OBS Studio
 - TikTok Live account
@@ -39,9 +38,9 @@ cp .env.example .env
 
 4. Edit `.env` and add your API keys:
 ```
-D_ID_KEY=your_d_id_api_key_here
+ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
+ELEVENLABS_VOICE_ID=your_elevenlabs_voice_id_here
 OPENAI_API_KEY=your_openai_api_key_here
-D_ID_AVATAR_URL=https://your-avatar-image-url.jpg
 ```
 
 5. Start the server:
@@ -75,7 +74,7 @@ npm start
 1. Start the server: `npm start`
 2. Open OBS and start the Browser Source
 3. Start streaming to TikTok Live
-4. Viewers can interact with the avatar through chat messages
+4. Viewers can interact with the chatbot through chat messages
 
 ## Development
 
@@ -84,18 +83,17 @@ npm start
 
 ## Architecture
 
-- `src/server.js` - Express server and WebSocket handling
-- `src/didService.js` - D-ID API integration
+- `src/server.js` - Express server and API endpoints
 - `src/chatService.js` - OpenAI ChatGPT integration
+- `src/ttsService.js` - ElevenLabs TTS integration
 - `src/public/` - Frontend files
   - `index.html` - OBS Browser Source UI
-  - `app.js` - WebRTC and chat handling
+  - `app.js` - Chat handling
 
 ## Error Handling
 
 The system includes automatic:
-- WebRTC reconnection
-- Stream session recovery
+- API error handling
 - Error logging
 - Status display
 
