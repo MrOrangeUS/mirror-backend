@@ -85,4 +85,4 @@ obs/
 # Unity build and local config ignores
 /Logs/
 /stream.env
-/Assets/StreamingAssets/ffmpeg.exe 
+/Assets/StreamingAssets/ffmpeg.exe public/audio/

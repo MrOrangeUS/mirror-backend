@@ -1,114 +1,57 @@
-# Mirror.exe - TikTok Live AI Chatbot
+# Mirror App
 
-A real-time AI chatbot for TikTok Live streams, powered by ElevenLabs for text-to-speech and OpenAI's ChatGPT for conversation.
-
-## Features
-
-- Real-time AI chatbot responses using ChatGPT
-- High-quality text-to-speech using ElevenLabs
-- TikTok Live integration via OBS
-- Automatic error handling and logging
-- QR code overlay for easy access
-
-## Prerequisites
-
-- Node.js 18+ and npm
-- ElevenLabs API key
-- OpenAI API key
-- OBS Studio
-- TikTok Live account
+Mirror connects Twitch chat to a Unity avatar with AI-powered responses and lip-synced speech. Python handles chat, GPT and TTS, while Unity plays the audio and animates the avatar.
 
 ## Setup
 
-1. Clone the repository:
+### 1. Install Python Dependencies
 ```bash
-git clone https://github.com/yourusername/mirror-backend.git
-cd mirror-backend
+cd python
+pip install -r requirements.txt
 ```
 
-2. Install dependencies:
+Create a `.env` file in the project root with:
+```
+TWITCH_CHANNEL=your_channel
+TWITCH_OAUTH_TOKEN=oauth:token_here
+OPENAI_API_KEY=sk-...
+ELEVEN_API_KEY=your_eleven_key
+ELEVEN_VOICE_ID=your_voice_id
+```
+
+### 2. Run the Backend
 ```bash
-npm install
+python -m python.main
+```
+This starts the Twitch listener and the WebSocket server on `ws://localhost:8765`.
+
+### 3. Unity Project
+1. Import the **NativeWebSocket** package from GitHub (`https://github.com/endel/NativeWebSocket.git`).
+2. Copy `Assets/Scripts/NativeWebSocketReceiver.cs` and `Assets/Scripts/HeadMovementController.cs` into your Unity project's `Assets/Scripts/` folder.
+3. Add one `AudioSource` to your avatar root and attach **NativeWebSocketReceiver**.
+4. Attach **HeadMovementController** to the avatar head bone and assign the same `AudioSource`.
+5. Ensure the scene contains only one `AudioListener` (on the Main Camera).
+6. Press Play to connect.
+
+Incoming chat/gift/follow events and AI responses are logged. When an audio event arrives, the MP3 is streamed and played back with simple head nods based on volume.
+
+## File Structure
+```
+python/
+  config.py
+  gpt_handler.py
+  tts_handler.py
+  twitch_listener.py
+  websocket_server.py
+  main.py
+  requirements.txt
+Assets/
+  Scripts/NativeWebSocketReceiver.cs
+  Scripts/HeadMovementController.cs
+public/audio/              # generated TTS files
 ```
 
-3. Create a `.env` file based on `.env.example`:
-```bash
-cp .env.example .env
-```
-
-4. Edit `.env` and add your API keys:
-```
-ELEVENLABS_API_KEY=your_elevenlabs_api_key_here
-ELEVENLABS_VOICE_ID=your_elevenlabs_voice_id_here
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-5. Start the server:
-```bash
-npm start
-```
-
-## OBS Setup
-
-1. Open OBS Studio
-2. Add a new Browser Source
-3. Set the URL to `http://localhost:3000`
-4. Set the width to 1080 and height to 1920
-5. Check "Shutdown source when not visible"
-6. Click OK
-
-## TikTok Live Setup
-
-1. Go to your TikTok Creator Portal
-2. Start a new live stream
-3. Copy the RTMP URL and Stream Key
-4. In OBS:
-   - Go to Settings → Stream
-   - Select "Custom" as the service
-   - Paste the RTMP URL
-   - Paste the Stream Key
-5. Click "Start Streaming"
-
-## Usage
-
-1. Start the server: `npm start`
-2. Open OBS and start the Browser Source
-3. Start streaming to TikTok Live
-4. Viewers can interact with the chatbot through chat messages
-
-## Development
-
-- `npm run dev` - Start server with hot reload
-- `npm start` - Start production server
-
-## Architecture
-
-- `src/server.js` - Express server and API endpoints
-- `src/chatService.js` - OpenAI ChatGPT integration
-- `src/ttsService.js` - ElevenLabs TTS integration
-- `src/public/` - Frontend files
-  - `index.html` - OBS Browser Source UI
-  - `app.js` - Chat handling
-
-## Error Handling
-
-The system includes automatic:
-- API error handling
-- Error logging
-- Status display
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-MIT License - see LICENSE file for details
-
----
-
-Note: The chatbot system prompt was updated in June 2025 to make responses briefer (1–2 sentences) and more nonchalant/witty by default. 
+## Notes
+- Chat messages are rate limited to 3 per user per 30 s and duplicate messages within 10 s are ignored.
+- Gifts are only broadcast when the amount is ≥100 bits.
+- Audio files are saved under `public/audio/` for Unity to load.
