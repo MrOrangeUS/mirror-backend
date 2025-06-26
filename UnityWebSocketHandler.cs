@@ -1,5 +1,4 @@
 using UnityEngine;
-using TMPro;
 using WebSocketSharp;
 using System;
 using System.Collections;
@@ -8,8 +7,6 @@ using System.Collections;
 public class Message
 {
     public string type;
-    public string comment;
-    public string text;
     public string path;
 }
 
@@ -17,28 +14,24 @@ public class UnityWebSocketHandler : MonoBehaviour
 {
     [Header("WebSocket Settings")]
     private readonly string wsUrl = "ws://localhost:8765";
-    private WebSocket ws;
-
-    [Header("UI References")]
-    public TextMeshProUGUI chatText;
-    public TextMeshProUGUI responseText;
+    private WebSocket webSocket;
 
     [Header("Audio")]
     public AudioSource audioSource;
 
     void Start()
     {
-        if (!chatText || !responseText || !audioSource)
+        if (!audioSource)
         {
-            Debug.LogError("Assign ChatText, ResponseText & AudioSource in Inspector!");
+            Debug.LogError("Assign AudioSource in Inspector!");
             return;
         }
 
-        ws = new WebSocket(wsUrl);
-        ws.OnMessage += (sender, e) => OnWsMessage(e.Data);
-        ws.OnError   += (sender, e) => Debug.LogError("WS Error: " + e.Message);
-        ws.OnClose   += (sender, e) => Debug.Log("WS Closed");
-        ws.Connect();
+        webSocket = new WebSocket(wsUrl);
+        webSocket.OnMessage += (sender, e) => OnWsMessage(e.Data);
+        webSocket.OnError   += (sender, e) => Debug.LogError("WS Error: " + e.Message);
+        webSocket.OnClose   += (sender, e) => Debug.Log("WS Closed");
+        webSocket.Connect();
         Debug.Log("WS connected to " + wsUrl);
     }
 
@@ -47,20 +40,9 @@ public class UnityWebSocketHandler : MonoBehaviour
         try
         {
             var msg = JsonUtility.FromJson<Message>(json);
-            switch (msg.type)
+            if (msg.type == "audio")
             {
-                case "chat":
-                    chatText.text = msg.comment;
-                    break;
-                case "response":
-                    responseText.text = msg.text;
-                    break;
-                case "audio":
-                    StartCoroutine(LoadAndPlayAudio(msg.path));
-                    break;
-                default:
-                    Debug.LogWarning("Unknown WS msg: " + msg.type);
-                    break;
+                StartCoroutine(LoadAndPlayAudio(msg.path));
             }
         }
         catch (Exception ex)
@@ -88,9 +70,9 @@ public class UnityWebSocketHandler : MonoBehaviour
         }
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
-        if (ws != null && ws.ReadyState == WebSocketState.Open)
-            ws.Close();
+        if (webSocket != null && webSocket.ReadyState == WebSocketState.Open)
+            webSocket.Close();
     }
-} 
+}

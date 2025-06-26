@@ -1,0 +1,8 @@
+python-dotenv
+openai
+requests
+python-socketio[asyncio]
+twitchio
+elevenlabs
+fastapi
+uvicorn 

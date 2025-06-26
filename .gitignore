@@ -80,4 +80,9 @@ yarn.lock
 Thumbs.db
 
 # OBS/streaming temp files
-obs/ 
+obs/
+
+# Unity build and local config ignores
+/Logs/
+/stream.env
+/Assets/StreamingAssets/ffmpeg.exe 
